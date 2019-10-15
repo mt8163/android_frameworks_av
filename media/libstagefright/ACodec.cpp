@@ -62,6 +62,18 @@
 #include "include/SharedMemoryBuffer.h"
 #include <media/stagefright/omx/OMXUtils.h>
 
+
+#ifdef MTK_HARDWARE
+#include <media/stagefright/dpframework/DpBlitStream.h>
+
+#define HAL_PIXEL_FORMAT_NV12_BLK 0x7F000001
+#define HAL_PIXEL_FORMAT_I420 (0x32315659 + 0x10)
+
+const OMX_COLOR_FORMATTYPE OMX_MTK_COLOR_FormatYV12 = (OMX_COLOR_FORMATTYPE)0x7F000200;
+const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV = (OMX_COLOR_FORMATTYPE)0x7F000001;
+#endif
+
+
 namespace android {
 
 using binder::Status;
@@ -201,6 +213,35 @@ struct CodecObserver : public BnOMXObserver {
                             omx_msg.u.extended_buffer_data.timestamp);
                     msg->setInt32(
                             "fence_fd", omx_msg.fenceFd);
+#ifdef MTK_HARDWARE
+                    msg->setInt32(
+                            "ticks",
+                            omx_msg.u.extended_buffer_data.token_tick);
+                if( 0x00010000 == (0x00010000 & omx_msg.u.extended_buffer_data.flags) )
+                {
+                   msg->setInt32(
+                            "token_VA",
+                            omx_msg.u.extended_buffer_data.token_VA);
+                    msg->setInt32(
+                            "token_PA",
+                            omx_msg.u.extended_buffer_data.token_PA);
+                    msg->setInt32(
+                            "token_FD",
+                            omx_msg.u.extended_buffer_data.token_FD);
+                }
+                else
+                {
+                    msg->setInt32(
+                            "token_VA",
+                            0);
+                    msg->setInt32(
+                            "token_PA",
+                            0);
+                    msg->setInt32(
+                            "token_FD",
+                            0);
+                }
+#endif
                     break;
                 }
 
@@ -1106,18 +1147,35 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
         usage |= GRALLOC_USAGE_PROTECTED;
     }
 
+#define GRALLOC_USAGE_SECURE 0x01000000;
+    if (mFlags & kFlagIsSecure) {
+        usage |= GRALLOC_USAGE_SECURE;
+        ALOGW("ACODEC: use GRALLOC_USAGE_SECURE\n");
+    }
+
+
     usage |= kVideoGrallocUsage;
     *finalUsage = usage;
 
     memset(&mLastNativeWindowCrop, 0, sizeof(mLastNativeWindowCrop));
     mLastNativeWindowDataSpace = HAL_DATASPACE_UNKNOWN;
 
+#ifdef MTK_HARDWARE
+    OMX_COLOR_FORMATTYPE eHalColorFormat = def.format.video.eColorFormat;
+    setHalWindowColorFormat(eHalColorFormat);
+#endif
+
+
     ALOGV("gralloc usage: %#x(OMX) => %#x(ACodec)", omxUsage, usage);
     return setNativeWindowSizeFormatAndUsage(
             nativeWindow,
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
+#ifdef MTK_HARDWARE
+            eHalColorFormat,
+#else
             def.format.video.eColorFormat,
+#endif
             mRotationDegrees,
             usage,
             reconnect);
@@ -1401,6 +1459,29 @@ void ACodec::dumpBuffers(OMX_U32 portIndex) {
                 _asString(info.mStatus), info.mStatus, info.mDequeuedAt);
     }
 }
+
+#ifdef MTK_HARDWARE
+void ACodec::setHalWindowColorFormat(OMX_COLOR_FORMATTYPE &eHalColorFormat) {
+    ALOGE("[MTK] setHalWindowColorFormat(%#x) - %s",eHalColorFormat,mComponentName.c_str());
+
+    if (!strncmp("OMX.MTK.", mComponentName.c_str(), 8)) {
+        switch (eHalColorFormat) {
+            case OMX_COLOR_FormatYUV420Planar:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_I420;
+                break;
+            case OMX_MTK_COLOR_FormatYV12:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YV12;
+                break;
+            case OMX_COLOR_FormatVendorMTKYUV:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_NV12_BLK;
+                break;
+            default:
+                eHalColorFormat = (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_I420;
+                break;
+        }
+    }
+}
+#endif
 
 status_t ACodec::cancelBufferToNativeWindow(BufferInfo *info) {
     CHECK_EQ((int)info->mStatus, (int)BufferInfo::OWNED_BY_US);
@@ -2659,6 +2740,12 @@ status_t ACodec::setupAACCodec(
         int32_t maxOutputChannelCount, const drcParams_t& drc,
         int32_t pcmLimiterEnable) {
     if (encoder && isADTS) {
+#ifdef MTK_HARDWARE  //Error handling for WhatsApp issue.
+    if (encoder && sampleRate == 44000)
+    {
+        sampleRate = 44100;
+    }
+#endif
         return -EINVAL;
     }
 
@@ -3768,8 +3855,19 @@ status_t ACodec::setupVideoEncoder(
     }
 
     video_def->nSliceHeight = sliceHeight;
-
+#ifdef MTK_HARDWARE //for continus shot feature
+    ALOGD("nStride %d, nSliceHeight %d", video_def->nStride, video_def->nSliceHeight);
+    //support RGB565 and RGB888 size
+    if( colorFormat == OMX_COLOR_Format16bitRGB565 )
+        def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 2);
+    else if( colorFormat == OMX_COLOR_Format24bitRGB888 )
+        def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 3);
+    else if( colorFormat == OMX_COLOR_Format32bitARGB8888 )
+        def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 4);
+    else
+#else
     def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 3) / 2;
+#endif
 
     float framerate;
     if (!msg->findFloat("frame-rate", &framerate)) {
@@ -4840,11 +4938,17 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                             rect.nWidth = videoDef->nFrameWidth;
                             rect.nHeight = videoDef->nFrameHeight;
                         }
-
-                        if (rect.nLeft < 0 ||
-                            rect.nTop < 0 ||
+#ifdef MTK_HARDWARE
+                    if (!strncmp(mComponentName.c_str(), "OMX.MTK.", 8) && mOMX->getConfig(
+                            mNode, (OMX_INDEXTYPE) 0x7f00001c /* OMX_IndexVendorMtkOmxVdecGetCropInfo */,
+                            &rect, sizeof(rect)) != OK) {
+                        rect.nLeft = 0;
+                        rect.nTop = 0;
+                        rect.nWidth = videoDef->nFrameWidth;
+                        rect.nHeight = videoDef->nFrameHeight;
+                    }
+#endif
                             rect.nLeft + rect.nWidth > videoDef->nFrameWidth ||
-                            rect.nTop + rect.nHeight > videoDef->nFrameHeight) {
                             ALOGE("Wrong cropped rect (%d, %d, %u, %u) vs. frame (%u, %u)",
                                     rect.nLeft, rect.nTop,
                                     rect.nWidth, rect.nHeight,

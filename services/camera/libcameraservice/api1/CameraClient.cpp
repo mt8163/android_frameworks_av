@@ -105,9 +105,11 @@ status_t CameraClient::initialize(sp<CameraProviderManager> manager) {
     // Enable zoom, error, focus, and metadata messages by default
     enableMsgType(CAMERA_MSG_ERROR | CAMERA_MSG_ZOOM | CAMERA_MSG_FOCUS |
                   CAMERA_MSG_PREVIEW_METADATA | CAMERA_MSG_FOCUS_MOVE);
+
 #ifdef MTK_HARDWARE
     enableMsgType(MTK_CAMERA_MSG_EXT_NOTIFY | MTK_CAMERA_MSG_EXT_DATA);
 #endif
+
     LOG1("CameraClient::initialize X (pid %d, id %d)", callingPid, mCameraId);
     return OK;
 }
@@ -809,7 +811,7 @@ void CameraClient::disableMsgType(int32_t msgType) {
 
 #define CHECK_MESSAGE_INTERVAL 10 // 10ms
 bool CameraClient::lockIfMessageWanted(int32_t msgType) {
-#if MTK_HARDWARE
+#ifdef MTK_HARDWARE
     return true;
 #endif
     int sleepCount = 0;
@@ -870,6 +872,8 @@ void CameraClient::notifyCallback(int32_t msgType, int32_t ext1,
     if (client.get() == nullptr) return;
 
     if (!client->lockIfMessageWanted(msgType)) return;
+
+
 #ifdef MTK_HARDWARE
     if (msgType == MTK_CAMERA_MSG_EXT_NOTIFY) {
 	LOG2("MtknotifyCallback(ext1:0x%x, ext2:0x%x)", ext1, ext2);
@@ -888,9 +892,7 @@ void CameraClient::notifyCallback(int32_t msgType, int32_t ext1,
 	return;
     }
 #endif
-    switch (msgType) {
         case CAMERA_MSG_SHUTTER:
-            // ext1 is the dimension of the yuv picture.
             client->handleShutter();
             break;
         default:
@@ -1036,7 +1038,7 @@ void CameraClient::handleCallbackTimestampBatch(
 #ifdef MTK_HARDWARE
 void CameraClient::handleMtkShutter(int32_t ext2) {
     if (mPlayShutterSound && (ext2 == 1)) {
-        mCameraService->playSound(CameraService::SOUND_SHUTTER);
+        sCameraService->playSound(CameraService::SOUND_SHUTTER);
     }
 
     sp<hardware::ICameraClient> c = mRemoteCallback;

@@ -14,7 +14,7 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libbinder
 
-LOCAL_CFLAGS := -Wall -Werror
+LOCAL_CFLAGS := -Wall -Werror -DMTK_HARDWARE
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -62,6 +62,10 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 
+ifeq ($(BOARD_USES_LEGACY_MTK_AV_BLOB),true)
+LOCAL_CFLAGS += -DLEGACY_MTK_AV_BLOB
+endif
+
 LOCAL_MODULE:= libaudioflinger
 
 LOCAL_SRC_FILES += \
@@ -80,7 +84,7 @@ LOCAL_CFLAGS += -DSTATE_QUEUE_INSTANTIATIONS='"StateQueueInstantiations.cpp"'
 
 LOCAL_CFLAGS += -fvisibility=hidden
 
-LOCAL_CFLAGS += -Werror -Wall
+LOCAL_CFLAGS += -Werror -Wall -DMTK_HARDWARE
 
 include $(BUILD_SHARED_LIBRARY)
 

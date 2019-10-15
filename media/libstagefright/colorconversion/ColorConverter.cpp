@@ -26,6 +26,21 @@
 #include "libyuv/video_common.h"
 
 #ifdef MTK_HARDWARE
+#include <DpBlitStream.h>
+
+const OMX_COLOR_FORMATTYPE OMX_MTK_COLOR_FormatYV12 = (OMX_COLOR_FORMATTYPE)0x7F000200;
+const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV = (OMX_COLOR_FORMATTYPE)0x7F000001;
+const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV_FCM = (OMX_COLOR_FORMATTYPE)0x7F000002;
+#endif
+
+
+#include <functional>
+#include <sys/time.h>
+
+#define USE_LIBYUV
+#define PERF_PROFILING 0
+
+#ifdef MTK_HARDWARE
 #include <cutils/properties.h>
 #include "DpBlitStream.h"
 #include <stdio.h>
@@ -113,10 +128,16 @@ ColorConverter::BitmapParams::BitmapParams(
     case OMX_COLOR_FormatCbYCrY:
     case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
     case OMX_COLOR_FormatYUV420SemiPlanar:
+#ifdef MTK_HARDWARE
+    case OMX_MTK_COLOR_FormatYV12:
+    case OMX_COLOR_FormatVendorMTKYUV:
+    case OMX_COLOR_FormatVendorMTKYUV_FCM:
+#endif
     case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
         mBpp = 1;
         mStride = mWidth;
         break;
+
 
     default:
         ALOGE("Unsupported color format %d", mColorFormat);
@@ -680,27 +701,17 @@ uint8_t *ColorConverter::initClip() {
 
     return &mClip[-kClipMin];
 }
-
 #ifdef MTK_HARDWARE
-status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const BitmapParams &dst)
-{
-    ALOGD("srcWidth(%zu), srcHeight(%zu), srcCropLeft(%zu), srcCropTop(%zu), srcCropRight(%zu), srcCropBottom(%zu)",
-       src.mWidth, src.mHeight, src.mCropLeft, src.mCropTop, src.mCropRight, src.mCropBottom);
-    ALOGD("dstWidth(%zu), dstHeight(%zu), dstCropLeft(%zu), dstCropTop(%zu), dstCropRight(%zu), dstCropBottom(%zu)",
-       dst.mWidth, dst.mHeight, dst.mCropLeft, dst.mCropTop, dst.mCropRight, dst.mCropBottom);
-    DpBlitStream *blitStream = new DpBlitStream();
-//    int srcWidth = src.cropWidth();
-//    int srcHeight = src.cropHeight();
+status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const BitmapParams &dst) {
+    DpBlitStream blitStream;
     unsigned int srcWStride = src.mWidth;
     unsigned int srcHStride = src.mHeight;
 
     DpRect srcRoi;
-    srcRoi.x = 0;
-    srcRoi.y = 0;
-    srcRoi.w = dst.mWidth;
-    srcRoi.h = dst.mHeight;
-
-    ALOGD("src stride aligned, w(%d), h(%d)", srcWStride, srcHStride);
+    srcRoi.x = src.mCropLeft;
+    srcRoi.y = src.mCropTop;
+    srcRoi.w = src.mCropRight - src.mCropLeft;
+    srcRoi.h = src.mCropBottom - src.mCropTop;
 
     unsigned int dstWStride = dst.mWidth ;
     unsigned int dstHStride = dst.mHeight ;
@@ -710,19 +721,17 @@ status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const Bitmap
     char retriever_propty_rgb[100];
 
     if (mSrcFormat == OMX_COLOR_FormatYUV420Planar) {
-    char* planar[3];
-    unsigned int length[3];
-    planar[0] = (char*)src.mBits;
-    length[0] = srcWStride*srcHStride;
-    planar[1] = planar[0] + length[0];
-    length[1] = srcWStride*srcHStride/4;
-    planar[2] = planar[1] + length[1];
-    length[2] = length[1];
-    ALOGD("Yaddr(%p), Uaddr(%p), Vaddr(%p) YUV420P", planar[0], planar[1], planar[2]);
-    ALOGD("Ylen(%d), Ulen(%d), Vlen(%d)", length[0], length[1], length[2]);
+        char* planar[3];
+        unsigned int length[3];
+        planar[0] = (char*)src.mBits;
+        length[0] = srcWStride*srcHStride;
+        planar[1] = planar[0] + length[0];
+	      length[1] = srcWStride*srcHStride/4;
+        planar[2] = planar[1] + length[1];
+        length[2] = length[1];
 
-    blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 3);
-    blitStream->setSrcConfig(srcWStride, srcHStride, eYUV_420_3P, eInterlace_None, &srcRoi);
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 3);
+        blitStream.setSrcConfig(srcWStride, srcHStride, eYUV_420_3P, eInterlace_None, &srcRoi);
     }
     else if (mSrcFormat == OMX_MTK_COLOR_FormatYV12) {
         char* planar[3];
@@ -730,40 +739,12 @@ status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const Bitmap
         planar[0] = (char*)src.mBits;
         length[0] = srcWStride*srcHStride;
         planar[1] = planar[0] + length[0];
-        length[1] = (((srcWStride>>1)+0xf) & (~0xf))*srcHStride/2;
+        length[1] = srcWStride*srcHStride/4;
         planar[2] = planar[1] + length[1];
         length[2] = length[1];
-        ALOGD("Yaddr(%p), Uaddr(%p), Vaddr(%p) YV12", planar[0], planar[1], planar[2]);
-        ALOGD("Ylen(%d), Ulen(%d), Vlen(%d)", length[0], length[1], length[2]);
 
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 3);
-        //blitStream->setSrcConfig(srcWStride, srcHStride, eYV12, eInterlace_None, &srcRoi);
-        blitStream->setSrcConfig(srcWStride, srcHStride, srcWStride, (((srcWStride>>1)+0xf) & (~0xf)), eYV12, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
-    }
-    else if (mSrcFormat == OMX_COLOR_Format32bitARGB8888) {
-        char* planar[1];
-        unsigned int length[1];
-        planar[0] = (char*)src.mBits;
-        length[0] = srcWStride*srcHStride*4;
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 1);
-        blitStream->setSrcConfig(srcWStride, srcHStride, eRGBA8888, eInterlace_None, &srcRoi);
-    }
-/*
-    if (mSrcFormat == HAL_PIXEL_FORMAT_YCbCr_420_888) {
-        char* planar[3];
-        unsigned int length[3];
-        planar[0] = (char*)src.mBits;
-        length[0] = srcWStride*srcHStride;
-        planar[1] = planar[0] + length[0];
-        length[1] = (((srcWStride>>1)+0xf) & (~0xf))*srcHStride/2;
-        planar[2] = planar[1] + length[1];
-        length[2] = length[1];
-        ALOGD("Yaddr(%p), Uaddr(%p), Vaddr(%p) YV12", planar[0], planar[1], planar[2]);
-        ALOGD("Ylen(%d), Ulen(%d), Vlen(%d)", length[0], length[1], length[2]);
-
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 3);
-        //blitStream->setSrcConfig(srcWStride, srcHStride, eYV12, eInterlace_None, &srcRoi);
-        blitStream->setSrcConfig(srcWStride, srcHStride, srcWStride, (((srcWStride>>1)+0xf) & (~0xf)), eYV12, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 3);
+        blitStream.setSrcConfig(srcWStride, srcHStride, eYV12, eInterlace_None, &srcRoi);
     }
     else if (mSrcFormat == OMX_COLOR_FormatVendorMTKYUV) {
         char* planar[2];
@@ -772,12 +753,9 @@ status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const Bitmap
         length[0] = srcWStride*srcHStride;
         planar[1] = planar[0] + length[0];
         length[1] = srcWStride*srcHStride/2;
-        ALOGD("Yaddr(%p), Caddr(%p)", planar[0], planar[1]);
-        ALOGD("Ylen(%d), Clen(%d)", length[0], length[1]);
 
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 2);
-        //blitStream->setSrcConfig(srcWStride, srcHStride, eNV12_BLK, eInterlace_None, &srcRoi);
-        blitStream->setSrcConfig(srcWStride, srcHStride, srcWStride * 32, srcWStride * 16, eNV12_BLK, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 2);
+        blitStream.setSrcConfig(srcWStride, srcHStride, srcWStride * 32, srcWStride * 16, eNV12_BLK, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
     }
     else if (mSrcFormat == OMX_COLOR_FormatVendorMTKYUV_FCM) {
         char* planar[2];
@@ -786,103 +764,28 @@ status_t ColorConverter::convertYUVToRGBHW(const BitmapParams &src, const Bitmap
         length[0] = srcWStride*srcHStride;
         planar[1] = planar[0] + length[0];
         length[1] = srcWStride*srcHStride/2;
-        ALOGD("Yaddr(%p), Caddr(%p)", planar[0], planar[1]);
-        ALOGD("Ylen(%d), Clen(%d)", length[0], length[1]);
 
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 2);
-        //blitStream->setSrcConfig(srcWStride, srcHStride, eNV12_BLK_FCM, eInterlace_None, &srcRoi);
-        blitStream->setSrcConfig(srcWStride, srcHStride, srcWStride * 32, srcWStride * 16, eNV12_BLK_FCM, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
+        blitStream.setSrcBuffer((void**)planar, (unsigned int*)length, 2);
+        blitStream.setSrcConfig(srcWStride, srcHStride, srcWStride * 32, srcWStride * 16, eNV12_BLK_FCM, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
     }
-    else if (mSrcFormat == OMX_COLOR_FormatVendorMTKYUV_10BIT_H) {
-        char* planar[2];
-        unsigned int length[2];
-        planar[0] = (char*)src.mBits;
-        length[0] = srcWStride*srcHStride*5/4;
-        planar[1] = planar[0] + VDEC_ROUND_N(length[0], 512);
-        length[1] = length[0] >> 1;
-        ALOGD("Yaddr(%p), Caddr(%p)", planar[0], planar[1]);
-        ALOGD("Ylen(%d), Clen(%d)", length[0], length[1]);
 
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 2);
-        //blitStream->setSrcConfig(srcWStride, srcHStride, eNV12_BLK, eInterlace_None, &srcRoi);
-        blitStream->setSrcConfig(srcWStride, srcHStride, srcWStride * 40, srcWStride * 20, DP_COLOR_420_BLKP_10_H, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
-    }
-    else if (mSrcFormat == OMX_COLOR_FormatVendorMTKYUV_10BIT_V) {
-        char* planar[2];
-        unsigned int length[2];
-        planar[0] = (char*)src.mBits;
-        length[0] = srcWStride*srcHStride*5/4;
-        planar[1] = planar[0] + VDEC_ROUND_N(length[0], 512);
-        length[1] = length[0] >> 1;
-        ALOGD("Yaddr(%p), Caddr(%p)", planar[0], planar[1]);
-        ALOGD("Ylen(%d), Clen(%d)", length[0], length[1]);
-
-        blitStream->setSrcBuffer((void**)planar, (unsigned int*)length, 2);
-        //blitStream->setSrcConfig(srcWStride, srcHStride, eNV12_BLK, eInterlace_None, &srcRoi);
-        blitStream->setSrcConfig(srcWStride, srcHStride, srcWStride * 40, srcWStride * 20, DP_COLOR_420_BLKP_10_V, DP_PROFILE_BT601, eInterlace_None, &srcRoi);
-    }
-*/
-    ALOGD("dst addr(%p), w(%d), h(%d)", dst.mBits, dstWStride, dstHStride);
     if (mDstFormat == OMX_COLOR_Format16bitRGB565) {
-    blitStream->setDstBuffer(dst.mBits, dst.mWidth * dst.mHeight * 2);
-    blitStream->setDstConfig(dst.mWidth, dst.mHeight, eRGB565);
+        blitStream.setDstBuffer(dst.mBits, dst.mWidth * dst.mHeight * 2);
+        blitStream.setDstConfig(dst.mWidth, dst.mHeight, eRGB565);
     }
     else if (mDstFormat == OMX_COLOR_Format32bitARGB8888) {
-    blitStream->setDstBuffer(dst.mBits, dst.mWidth * dst.mHeight * 4);
-        //  blitStream->setDstConfig(dst.mWidth, dst.mHeight, eARGB8888);
-    blitStream->setDstConfig(dst.mWidth, dst.mHeight, eRGBA8888);
+        blitStream.setDstBuffer(dst.mBits, dst.mWidth * dst.mHeight * 4);
+        blitStream.setDstConfig(dst.mWidth, dst.mHeight, eRGBA8888);
     }
 
-    sprintf(name_yuv, "/sdcard/retriever_%" PRId64 "_%zu_%zu.yuv",systemTime(),src.mWidth,src.mHeight);
-    sprintf(retriever_yuv_propty, "retriever.dump.yuv");
-    dumpColorConverterData(name_yuv,src.mBits,(src.mWidth*src.mHeight)*2,retriever_yuv_propty);
+    // Add Sharpness in Video Thumbnail
+    blitStream.setTdshp(1);
+    bool bRet = blitStream.invalidate();
 
-    //Add Sharpness in Video Thumbnail
-    blitStream->setTdshp(1);
-    bool bRet = blitStream->invalidate();
-    ALOGI("blitStream return %d.", bRet);
-
-    sprintf(name_rgb, "/sdcard/retriever_%" PRId64 "_%zu_%zu.rgb",systemTime(),dst.mWidth,dst.mHeight);
-    sprintf(retriever_propty_rgb, "retriever.dump.rgb");
-    if (mDstFormat == OMX_COLOR_Format16bitRGB565){
-        dumpColorConverterData(name_rgb,dst.mBits, dst.mWidth*dst.mHeight*2, retriever_propty_rgb);
-    }else if(mDstFormat == OMX_COLOR_Format32bitARGB8888){
-        dumpColorConverterData(name_rgb,dst.mBits, dst.mWidth*dst.mHeight*4, retriever_propty_rgb);
-    }
-
-    if(!bRet)
+    if (!bRet)
         return OK;
     else
         return UNKNOWN_ERROR;
-// debug: dump output buffer
-/*	sprintf(name, "/sdcard/clrcvt_output_%d_dmp", i);
-	fp = fopen(name, "w");
-	if (mDstFormat == OMX_COLOR_Format16bitRGB565)
-		fwrite(dst.mBits, dst.mWidth*dst.mHeight*2, 1, fp);
-	else if (mDstFormat == OMX_COLOR_Format32bitARGB8888)
-		fwrite(dst.mBits, dst.mWidth*dst.mHeight*4, 1, fp);
-	fclose(fp);
-	i++;
-*/
-    return OK;
-}
-
-void ColorConverter::dumpColorConverterData(const char * filepath, const void * buffer, size_t size,const char * propty) {
-
-    char value[PROPERTY_VALUE_MAX];
-    property_get(propty, value, "0");
-    int bflag=atoi(value);
-
-    if (bflag) {
-       FILE * fp= fopen (filepath, "w");
-       if (fp!=NULL) {
-            fwrite(buffer,size,1,fp);
-            fclose(fp);
-       } else {
-            ALOGV("dump %s fail",propty);
-       }
-    }
 }
 #endif
-
 }  // namespace android
