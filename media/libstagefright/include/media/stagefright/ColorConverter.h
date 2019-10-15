@@ -101,6 +101,10 @@ private:
 
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);
+#ifdef MTK_HARDWARE
+    status_t convertYUVToRGBHW(const BitmapParams &src, const BitmapParams &dst);
+#endif
+
 };
 
 }  // namespace android

@@ -20,7 +20,6 @@
 #include <soundtrigger/SoundTrigger.h>
 #include <utils/Log.h>
 #include "AudioPolicyService.h"
-
 namespace android {
 
 /* implementation of the client interface from the policy manager */

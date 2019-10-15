@@ -188,6 +188,7 @@ cc_library {
         "MediaResourcePolicy.cpp",
         "Visualizer.cpp",
         "StringArray.cpp",
+  	"mtkaudio_stubs.cpp",
     ],
 
     aidl: {
@@ -246,6 +247,7 @@ cc_library {
         "-Werror",
         "-Wno-error=deprecated-declarations",
         "-Wall",
+	"-DMTK_HARDWARE",
     ],
 
     version_script: "exports.lds",
