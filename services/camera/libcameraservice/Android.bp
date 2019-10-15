@@ -92,6 +92,8 @@ cc_library_shared {
         "libjpeg",
         "libmedia_omx",
         "libmemunreachable",
+        "libcam.client",
+        "libcam_utils",
         "libsensorprivacy",
         "libstagefright",
         "libstagefright_foundation",
@@ -132,6 +134,7 @@ cc_library_shared {
         "-Wextra",
         "-Werror",
         "-Wno-ignored-qualifiers",
+        "-DMTK_HARDWARE",
     ],
 
     product_variables: {
