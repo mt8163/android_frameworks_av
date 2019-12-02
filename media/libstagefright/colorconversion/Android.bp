@@ -7,7 +7,6 @@ cc_library_static {
     ],
 
     include_dirs: [
-	"frameworks/av/media/libstagefright/colorconversion/inc",
         "frameworks/native/include/media/openmax",
     ],
 
