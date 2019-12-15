@@ -97,6 +97,16 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-effects) \
     $(call include-path-for, audio-utils)
 
+ifeq ($(BOARD_USES_MTK_HARDWARE), true)
+LOCAL_CFLAGS += -DMTK_MEDIA_PROFILES
+endif
+
+
+LOCAL_CFLAGS +=  -DMTK_HARDWARE
+LOCAL_SRC_FILES += \
+    mtkaudio_stubs.cpp
+
+
 LOCAL_CFLAGS += -Werror -Wno-error=deprecated-declarations -Wall
 LOCAL_CLANG := true
 LOCAL_SANITIZE := unsigned-integer-overflow signed-integer-overflow

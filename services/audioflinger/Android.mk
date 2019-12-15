@@ -27,7 +27,7 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libbinder
 
-LOCAL_CFLAGS := -Wall -Werror
+LOCAL_CFLAGS := -Wall -Werror -DMTK_HARDWARE
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -105,7 +105,7 @@ LOCAL_CFLAGS += -DSTATE_QUEUE_INSTANTIATIONS='"StateQueueInstantiations.cpp"'
 
 LOCAL_CFLAGS += -fvisibility=hidden
 
-LOCAL_CFLAGS += -Werror -Wall
+LOCAL_CFLAGS += -Werror -Wall -DMTK_HARDWARE
 # DOLBY_START
 ifeq ($(strip $(DOLBY_ENABLE)),true)
     LOCAL_CFLAGS += $(dolby_cflags)
@@ -140,7 +140,7 @@ LOCAL_MODULE:= test-resample
 
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_CFLAGS := -Werror -Wall
+LOCAL_CFLAGS := -Werror -Wall -DMTK_HARDWARE
 
 include $(BUILD_EXECUTABLE)
 
@@ -181,7 +181,7 @@ endif
 
 LOCAL_MODULE := libaudioresampler
 
-LOCAL_CFLAGS += -Werror -Wall
+LOCAL_CFLAGS += -Werror -Wall -DMTK_HARDWARE
 
 # uncomment to disable NEON on architectures that actually do support NEON, for benchmarking
 #LOCAL_CFLAGS += -DUSE_NEON=false

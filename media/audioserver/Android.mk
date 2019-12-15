@@ -67,7 +67,7 @@ LOCAL_MODULE := audioserver
 
 LOCAL_INIT_RC := audioserver.rc
 
-LOCAL_CFLAGS := -Werror -Wall
+LOCAL_CFLAGS := -Werror -Wall -DMTK_HARDWARE
 # DOLBY_START
 ifeq ($(strip $(DOLBY_ENABLE)),true)
     LOCAL_CFLAGS += $(dolby_cflags)
