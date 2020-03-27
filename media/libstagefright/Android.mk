@@ -209,8 +209,7 @@ endif
 
 ifeq ($(strip $(BOARD_USES_MTK_HARDWARE)),true)
 LOCAL_SHARED_LIBRARIES += \
-    libdpframework \
-	libmtkcam_fwkutils
+    libdpframework
 endif
 
 LOCAL_MODULE:= libstagefright
