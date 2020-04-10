@@ -108,7 +108,7 @@ class DeviceHalLocal : public DeviceHalInterface
   private:
     audio_hw_device_t *mDev;
 
-#ifdef MTK_HARDWARE
+#ifdef LEGACY_MTK_AV_BLOB
     audio_stream_in_t *mIn;
 #endif
 

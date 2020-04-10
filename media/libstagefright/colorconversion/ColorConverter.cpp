@@ -27,10 +27,6 @@
 
 #ifdef MTK_HARDWARE
 #include <DpBlitStream.h>
-
-const OMX_COLOR_FORMATTYPE OMX_MTK_COLOR_FormatYV12 = (OMX_COLOR_FORMATTYPE)0x7F000200;
-const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV = (OMX_COLOR_FORMATTYPE)0x7F000001;
-const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV_FCM = (OMX_COLOR_FORMATTYPE)0x7F000002;
 #endif
 
 
@@ -46,8 +42,6 @@ const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV_FCM = (OMX_COLOR_FORMATT
 #include <stdio.h>
 #include <utils/Timers.h>
 #include <inttypes.h>
-
-static const int OMX_MTK_COLOR_FormatYV12 = 0x7F000200;
 #endif
 
 #define USE_LIBYUV

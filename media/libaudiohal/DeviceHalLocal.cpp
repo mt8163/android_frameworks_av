@@ -205,7 +205,7 @@ void DeviceHalLocal::closeOutputStream(struct audio_stream_out *stream_out) {
 }
 
 void DeviceHalLocal::closeInputStream(struct audio_stream_in *stream_in) {
-#ifdef MTK_HARDWARE
+#ifdef LEGACY_MTK_AV_BLOB
     mDev->close_input_stream(mDev, mIn);
     free(stream_in);
 #else

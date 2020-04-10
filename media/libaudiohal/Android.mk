@@ -16,6 +16,8 @@ LOCAL_SRC_FILES := \
     StreamHalLocal.cpp
 
 LOCAL_CFLAGS := -Wall -Werror
+LOCAL_CFLAGS += -DLEGACY_MTK_AV_BLOB
+
 
 ifeq ($(USE_LEGACY_LOCAL_AUDIO_HAL), true)
 

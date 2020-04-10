@@ -63,15 +63,10 @@
 #include <media/stagefright/omx/OMXUtils.h>
 
 
-#ifdef MTK_HARDWARE
 #include <media/stagefright/dpframework/DpBlitStream.h>
 
 #define HAL_PIXEL_FORMAT_NV12_BLK 0x7F000001
 #define HAL_PIXEL_FORMAT_I420 (0x32315659 + 0x10)
-
-const OMX_COLOR_FORMATTYPE OMX_MTK_COLOR_FormatYV12 = (OMX_COLOR_FORMATTYPE)0x7F000200;
-const OMX_COLOR_FORMATTYPE OMX_COLOR_FormatVendorMTKYUV = (OMX_COLOR_FORMATTYPE)0x7F000001;
-#endif
 
 
 namespace android {
@@ -213,7 +208,6 @@ struct CodecObserver : public BnOMXObserver {
                             omx_msg.u.extended_buffer_data.timestamp);
                     msg->setInt32(
                             "fence_fd", omx_msg.fenceFd);
-#ifdef MTK_HARDWARE
                     msg->setInt32(
                             "ticks",
                             omx_msg.u.extended_buffer_data.token_tick);
@@ -241,7 +235,6 @@ struct CodecObserver : public BnOMXObserver {
                             "token_FD",
                             0);
                 }
-#endif
                     break;
                 }
 
@@ -1160,10 +1153,10 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
     memset(&mLastNativeWindowCrop, 0, sizeof(mLastNativeWindowCrop));
     mLastNativeWindowDataSpace = HAL_DATASPACE_UNKNOWN;
 
-#ifdef MTK_HARDWARE
+//#ifdef MTK_HARDWARE
     OMX_COLOR_FORMATTYPE eHalColorFormat = def.format.video.eColorFormat;
     setHalWindowColorFormat(eHalColorFormat);
-#endif
+//#endif
 
 
     ALOGV("gralloc usage: %#x(OMX) => %#x(ACodec)", omxUsage, usage);
@@ -1171,11 +1164,11 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
             nativeWindow,
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
-#ifdef MTK_HARDWARE
+//#ifdef MTK_HARDWARE
             eHalColorFormat,
-#else
-            def.format.video.eColorFormat,
-#endif
+//#else
+//            def.format.video.eColorFormat,
+//#endif
             mRotationDegrees,
             usage,
             reconnect);
@@ -1460,7 +1453,7 @@ void ACodec::dumpBuffers(OMX_U32 portIndex) {
     }
 }
 
-#ifdef MTK_HARDWARE
+//#ifdef MTK_HARDWARE
 void ACodec::setHalWindowColorFormat(OMX_COLOR_FORMATTYPE &eHalColorFormat) {
     ALOGE("[MTK] setHalWindowColorFormat(%#x) - %s",eHalColorFormat,mComponentName.c_str());
 
@@ -1481,7 +1474,7 @@ void ACodec::setHalWindowColorFormat(OMX_COLOR_FORMATTYPE &eHalColorFormat) {
         }
     }
 }
-#endif
+//#endif
 
 status_t ACodec::cancelBufferToNativeWindow(BufferInfo *info) {
     CHECK_EQ((int)info->mStatus, (int)BufferInfo::OWNED_BY_US);
@@ -2740,12 +2733,12 @@ status_t ACodec::setupAACCodec(
         int32_t maxOutputChannelCount, const drcParams_t& drc,
         int32_t pcmLimiterEnable) {
     if (encoder && isADTS) {
-#ifdef MTK_HARDWARE  //Error handling for WhatsApp issue.
+//#ifdef MTK_HARDWARE  //Error handling for WhatsApp issue.
     if (encoder && sampleRate == 44000)
     {
         sampleRate = 44100;
     }
-#endif
+//#endif
         return -EINVAL;
     }
 
@@ -3277,7 +3270,10 @@ status_t ACodec::setSupportedOutputFormat(bool getLegacyFlexibleFormat) {
                 || format.eColorFormat == OMX_COLOR_FormatYUV420PackedPlanar
                 || format.eColorFormat == OMX_COLOR_FormatYUV420SemiPlanar
                 || format.eColorFormat == OMX_COLOR_FormatYUV420PackedSemiPlanar
-                || format.eColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar) {
+                || format.eColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar
+		 || format.eColorFormat == HAL_PIXEL_FORMAT_YV12
+		 || format.eColorFormat == OMX_MTK_COLOR_FormatYV12
+                ) {
             break;
         }
         // find best legacy non-standard format
@@ -3855,7 +3851,7 @@ status_t ACodec::setupVideoEncoder(
     }
 
     video_def->nSliceHeight = sliceHeight;
-#ifdef MTK_HARDWARE //for continus shot feature
+//#ifdef MTK_HARDWARE //for continus shot feature
     ALOGD("nStride %d, nSliceHeight %d", video_def->nStride, video_def->nSliceHeight);
     //support RGB565 and RGB888 size
     if( colorFormat == OMX_COLOR_Format16bitRGB565 )
@@ -3864,10 +3860,10 @@ status_t ACodec::setupVideoEncoder(
         def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 3);
     else if( colorFormat == OMX_COLOR_Format32bitARGB8888 )
         def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 4);
-    else
-#else
-    def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 3) / 2;
-#endif
+//#else
+// else
+//    def.nBufferSize = (video_def->nStride * video_def->nSliceHeight * 3) / 2;
+//#endif
 
     float framerate;
     if (!msg->findFloat("frame-rate", &framerate)) {
@@ -4938,17 +4934,20 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                             rect.nWidth = videoDef->nFrameWidth;
                             rect.nHeight = videoDef->nFrameHeight;
                         }
-#ifdef MTK_HARDWARE
-                    if (!strncmp(mComponentName.c_str(), "OMX.MTK.", 8) && mOMX->getConfig(
-                            mNode, (OMX_INDEXTYPE) 0x7f00001c /* OMX_IndexVendorMtkOmxVdecGetCropInfo */,
-                            &rect, sizeof(rect)) != OK) {
-                        rect.nLeft = 0;
-                        rect.nTop = 0;
-                        rect.nWidth = videoDef->nFrameWidth;
-                        rect.nHeight = videoDef->nFrameHeight;
-                    }
-#endif
+
+			if (!strncmp(mComponentName.c_str(), "OMX.MTK.", 8) && mOMXNode->getConfig(
+				(OMX_INDEXTYPE) 0x7f00001c /* OMX_IndexVendorMtkOmxVdecGetCropInfo */,
+				&rect, sizeof(rect)) != OK) {
+				rect.nLeft = 0;
+				rect.nTop = 0;
+				rect.nWidth = videoDef->nFrameWidth;
+				rect.nHeight = videoDef->nFrameHeight;
+			}
+					
+                        if (rect.nLeft < 0 ||
+                            rect.nTop < 0 ||
                             rect.nLeft + rect.nWidth > videoDef->nFrameWidth ||
+                            rect.nTop + rect.nHeight > videoDef->nFrameHeight) {
                             ALOGE("Wrong cropped rect (%d, %d, %u, %u) vs. frame (%u, %u)",
                                     rect.nLeft, rect.nTop,
                                     rect.nWidth, rect.nHeight,

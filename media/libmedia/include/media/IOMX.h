@@ -205,6 +205,10 @@ struct omx_message {
             OMX_U32 range_length;
             OMX_U32 flags;
             OMX_TICKS timestamp;
+            OMX_U32 token_tick;
+            OMX_U32 token_VA;
+            OMX_U32 token_PA;
+            OMX_U32 token_FD;
         } extended_buffer_data;
 
         // if type == FRAME_RENDERED

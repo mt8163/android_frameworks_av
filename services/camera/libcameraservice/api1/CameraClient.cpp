@@ -892,6 +892,7 @@ void CameraClient::notifyCallback(int32_t msgType, int32_t ext1,
 	return;
     }
 #endif
+switch (msgType) {
         case CAMERA_MSG_SHUTTER:
             client->handleShutter();
             break;
