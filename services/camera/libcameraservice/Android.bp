@@ -38,6 +38,9 @@ cc_library_shared {
         "api1/client2/JpegCompressor.cpp",
         "api1/client2/CaptureSequencer.cpp",
         "api1/client2/ZslProcessor.cpp",
+       //mtk add
+        "api1/mediatek/StreamImgBuf.cpp",
+       //mtk end
         "api2/CameraDeviceClient.cpp",
         "api2/CompositeStream.cpp",
         "api2/DepthCompositeStream.cpp",

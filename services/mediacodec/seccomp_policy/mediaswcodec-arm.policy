@@ -84,5 +84,9 @@ geteuid32: 1
 getgid32: 1
 getegid32: 1
 getgroups32: 1
+# asan only policy
+readlink: 1
+# ubsan only policy
+open: 1
 
 @include /system/etc/seccomp_policy/code_coverage.arm.policy
