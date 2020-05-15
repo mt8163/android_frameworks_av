@@ -11,6 +11,7 @@ cc_library_shared {
         "-Wall",
         "-Wextra",
         "-Werror",
+        "-DMTK_HARDWARE",
     ],
 
     required: [
@@ -43,6 +44,7 @@ cc_library_shared {
     cflags: [
         "-Wall",
         "-Werror",
+        "-DMTK_HARDWARE",
     ],
 
     shared_libs: [
