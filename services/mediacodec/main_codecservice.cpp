@@ -19,7 +19,7 @@
 
 // from LOCAL_C_INCLUDES
 #include "minijail.h"
-
+#include <android/fdsan.h>
 #include <binder/ProcessState.h>
 #include <cutils/properties.h>
 #include <hidl/HidlTransportSupport.h>
@@ -38,6 +38,7 @@ static const char kVendorSeccompPolicyPath[] =
 
 int main(int argc __unused, char** argv)
 {
+    android_fdsan_set_error_level(ANDROID_FDSAN_ERROR_LEVEL_DISABLED);
     strcpy(argv[0], "media.codec");
     LOG(INFO) << "mediacodecservice starting";
     signal(SIGPIPE, SIG_IGN);
