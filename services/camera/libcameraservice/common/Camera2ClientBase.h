@@ -59,6 +59,7 @@ public:
                       uid_t clientUid,
                       int servicePid,
                       bool overrideForPerfClass,
+                      bool overrideToPortrait,
                       bool legacyClient = false);
     virtual ~Camera2ClientBase();
 
@@ -74,6 +75,7 @@ public:
 
     virtual void          notifyError(int32_t errorCode,
                                       const CaptureResultExtras& resultExtras);
+    virtual void          notifyPhysicalCameraChange(const std::string &physicalId) override;
     // Returns errors on app ops permission failures
     virtual status_t      notifyActive(float maxPreviewFps);
     virtual void          notifyIdle(int64_t /*requestCount*/, int64_t /*resultErrorCount*/,

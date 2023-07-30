@@ -58,7 +58,8 @@ protected:
             int sensorOrientation,
             int clientPid,
             uid_t clientUid,
-            int servicePid);
+            int servicePid,
+            bool overrideToPortrait);
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 };
@@ -187,7 +188,8 @@ public:
             int clientPid,
             uid_t clientUid,
             int servicePid,
-            bool overrideForPerfClass);
+            bool overrideForPerfClass,
+            bool overrideToPortrait);
     virtual ~CameraDeviceClient();
 
     virtual status_t      initialize(sp<CameraProviderManager> manager,
@@ -207,6 +209,9 @@ public:
     virtual status_t      dumpWatchedEventsToVector(std::vector<std::string> &out);
 
     virtual status_t      setCameraServiceWatchdog(bool enabled);
+
+    virtual void          setStreamUseCaseOverrides(const std::vector<int64_t>& useCaseOverrides);
+    virtual void          clearStreamUseCaseOverrides() override;
 
     /**
      * Device listener interface
@@ -326,6 +331,7 @@ private:
     static const int32_t REQUEST_ID_NONE = -1;
 
     int32_t mRequestIdCounter;
+    bool mPrivilegedClient;
 
     std::vector<std::string> mPhysicalCameraIds;
 

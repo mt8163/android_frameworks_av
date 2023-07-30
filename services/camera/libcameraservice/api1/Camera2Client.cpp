@@ -61,11 +61,14 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         int clientPid,
         uid_t clientUid,
         int servicePid,
-        bool overrideForPerfClass):
+        bool overrideForPerfClass,
+        bool overrideToPortrait,
+        bool forceSlowJpegMode):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
                 false/*systemNativeClient - since no ndk for api1*/, clientFeatureId,
                 cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
-                clientUid, servicePid, overrideForPerfClass, /*legacyClient*/ true),
+                clientUid, servicePid, overrideForPerfClass, overrideToPortrait,
+                /*legacyClient*/ true),
         mParameters(api1CameraId, cameraFacing)
 {
     ATRACE_CALL();
@@ -76,6 +79,9 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
 
     SharedParameters::Lock l(mParameters);
     l.mParameters.state = Parameters::DISCONNECTED;
+    if (forceSlowJpegMode) {
+        l.mParameters.isSlowJpegModeForced = true;
+    }
 }
 
 status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
@@ -2343,6 +2349,15 @@ bool Camera2Client::supportsCameraMute() {
 
 status_t Camera2Client::setCameraMute(bool enabled) {
     return mDevice->setCameraMute(enabled);
+}
+
+void Camera2Client::setStreamUseCaseOverrides(
+        const std::vector<int64_t>& useCaseOverrides) {
+    mDevice->setStreamUseCaseOverrides(useCaseOverrides);
+}
+
+void Camera2Client::clearStreamUseCaseOverrides() {
+    mDevice->clearStreamUseCaseOverrides();
 }
 
 status_t Camera2Client::waitUntilCurrentRequestIdLocked() {

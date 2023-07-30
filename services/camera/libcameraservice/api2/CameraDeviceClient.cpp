@@ -66,7 +66,8 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         int sensorOrientation,
         int clientPid,
         uid_t clientUid,
-        int servicePid) :
+        int servicePid,
+        bool overrideToPortrait) :
     BasicClient(cameraService,
             IInterface::asBinder(remoteCallback),
             clientPackageName,
@@ -77,7 +78,8 @@ CameraDeviceClientBase::CameraDeviceClientBase(
             sensorOrientation,
             clientPid,
             clientUid,
-            servicePid),
+            servicePid,
+            overrideToPortrait),
     mRemoteCallback(remoteCallback) {
     // We don't need it for API2 clients, but Camera2ClientBase requires it.
     (void) api1CameraId;
@@ -96,14 +98,23 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         int clientPid,
         uid_t clientUid,
         int servicePid,
-        bool overrideForPerfClass) :
+        bool overrideForPerfClass,
+        bool overrideToPortrait) :
     Camera2ClientBase(cameraService, remoteCallback, clientPackageName, systemNativeClient,
                 clientFeatureId, cameraId, /*API1 camera ID*/ -1, cameraFacing, sensorOrientation,
-                clientPid, clientUid, servicePid, overrideForPerfClass),
+                clientPid, clientUid, servicePid, overrideForPerfClass, overrideToPortrait),
     mInputStream(),
     mStreamingRequestId(REQUEST_ID_NONE),
     mRequestIdCounter(0),
+    mPrivilegedClient(false),
     mOverrideForPerfClass(overrideForPerfClass) {
+
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.vendor.camera.privapp.list", value, "");
+    String16 packagelist(value);
+    if (packagelist.contains(clientPackageName.string())) {
+        mPrivilegedClient = true;
+    }
 
     ATRACE_CALL();
     ALOGI("CameraDeviceClient %s: Opened", cameraId.string());
@@ -923,7 +934,7 @@ binder::Status CameraDeviceClient::createStream(
         res = SessionConfigurationUtils::createSurfaceFromGbp(streamInfo,
                 isStreamInfoValid, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode);
+                streamUseCase, timestampBase, mirrorMode, mPrivilegedClient);
 
         if (!res.isOk())
             return res;
@@ -1283,7 +1294,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         res = SessionConfigurationUtils::createSurfaceFromGbp(outInfo,
                 /*isStreamInfoValid*/ false, surface, newOutputsMap.valueAt(i), mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode);
+                streamUseCase, timestampBase, mirrorMode, mPrivilegedClient);
         if (!res.isOk())
             return res;
 
@@ -1657,7 +1668,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         res = SessionConfigurationUtils::createSurfaceFromGbp(mStreamInfoMap[streamId],
                 true /*isStreamInfoValid*/, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode);
+                streamUseCase, timestampBase, mirrorMode, mPrivilegedClient);
 
         if (!res.isOk())
             return res;
@@ -1747,6 +1758,15 @@ bool CameraDeviceClient::supportsCameraMute() {
 
 status_t CameraDeviceClient::setCameraMute(bool enabled) {
     return mDevice->setCameraMute(enabled);
+}
+
+void CameraDeviceClient::setStreamUseCaseOverrides(
+        const std::vector<int64_t>& useCaseOverrides) {
+    mDevice->setStreamUseCaseOverrides(useCaseOverrides);
+}
+
+void CameraDeviceClient::clearStreamUseCaseOverrides() {
+    mDevice->clearStreamUseCaseOverrides();
 }
 
 binder::Status CameraDeviceClient::switchToOffline(

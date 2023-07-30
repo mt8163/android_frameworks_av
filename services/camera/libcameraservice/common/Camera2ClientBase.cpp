@@ -60,10 +60,11 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         uid_t clientUid,
         int servicePid,
         bool overrideForPerfClass,
+        bool overrideToPortrait,
         bool legacyClient):
         TClientBase(cameraService, remoteCallback, clientPackageName, systemNativeClient,
                 clientFeatureId, cameraId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
-                clientUid, servicePid),
+                clientUid, servicePid, overrideToPortrait),
         mSharedCameraCallbacks(remoteCallback),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
@@ -117,12 +118,12 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         case IPCTransport::HIDL:
             mDevice =
                     new HidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            mLegacyClient);
+                            TClientBase::mOverrideToPortrait, mLegacyClient);
             break;
         case IPCTransport::AIDL:
             mDevice =
                     new AidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            mLegacyClient);
+                            TClientBase::mOverrideToPortrait, mLegacyClient);
              break;
         default:
             ALOGE("%s Invalid transport for camera id %s", __FUNCTION__,
@@ -339,6 +340,29 @@ void Camera2ClientBase<TClientBase>::notifyError(
         const CaptureResultExtras& resultExtras) {
     ALOGE("Error condition %d reported by HAL, requestId %" PRId32, errorCode,
           resultExtras.requestId);
+}
+
+template <typename TClientBase>
+void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::string &physicalId) {
+    // We're only interested in this notification if overrideToPortrait is turned on.
+    if (!TClientBase::mOverrideToPortrait) {
+        return;
+    }
+
+    String8 physicalId8(physicalId.c_str());
+    auto physicalCameraMetadata = mDevice->infoPhysical(physicalId8);
+    auto orientationEntry = physicalCameraMetadata.find(ANDROID_SENSOR_ORIENTATION);
+
+    if (orientationEntry.count == 1) {
+        int orientation = orientationEntry.data.i32[0];
+        int rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
+
+        if (orientation == 0 || orientation == 180) {
+            rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
+        }
+
+        static_cast<TClientBase *>(this)->setRotateAndCropOverride(rotateAndCropMode);
+    }
 }
 
 template <typename TClientBase>
