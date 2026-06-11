@@ -364,7 +364,18 @@ status_t DeviceHalHidl::createAudioPatch(
         methodName = "updateAudioPatch";
 #endif
     }
-    return processReturn(methodName.c_str(), ret, retval);
+    status_t status = processReturn(methodName.c_str(), ret, retval);
+    if (status != NO_ERROR && num_sources > 0 && sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+            audio_is_input_device(sources[0].ext.device.type)) {
+        // Legacy/Buggy MTK HAL workaround: some HALs report support for audio patches
+        // but fail for input devices with -EPERM (-1) -> INVALID_STATE -> NOT_ENOUGH_DATA (-61)
+        // or -ENOSYS -> NOT_SUPPORTED -> INVALID_OPERATION (-38)
+        if (status == NOT_ENOUGH_DATA || status == INVALID_OPERATION) {
+            ALOGW("%s bypassing error %d for input device patch", __func__, status);
+            return NO_ERROR;
+        }
+    }
+    return status;
 }
 
 status_t DeviceHalHidl::releaseAudioPatch(audio_patch_handle_t patch) {
